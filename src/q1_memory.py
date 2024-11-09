@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Tuple
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("q1_memory")
 
 def q1_memory(file_path: str) -> List[Tuple[datetime.date, str]]:

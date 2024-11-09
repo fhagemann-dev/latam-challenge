@@ -5,7 +5,7 @@ import emoji
 import logging
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("q2_memory")
 
 def q2_memory(file_path: str) -> List[Tuple[str, int]]:

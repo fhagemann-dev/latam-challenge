@@ -5,7 +5,7 @@ import logging
 import json
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("q2_time")
 
 def q2_time(file_path: str) -> List[Tuple[str, int]]:
