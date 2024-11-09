@@ -1,61 +1,46 @@
-import logging
-from pyspark.sql.functions import col, to_date, count, desc, row_number
-from pyspark.sql.window import Window
+import polars as pl
 from typing import List, Tuple
-import datetime
+from datetime import datetime
+import json
+import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("q1_time")
 
-def q1_time(spark, file_path: str) -> List[Tuple[datetime.date, str]]:
+def q1_time(file_path: str) -> List[Tuple[datetime.date, str]]:
     """ 
-    The function examines a JSON file containing tweets and returns the top 10 dates with the 
-    most tweets and the user with the most posts for each of those days. Time-optimized function.
-    
-    Parameters
-    ----------
-    file_path : str
-        Path to the JSON file.
-
-    Returns
-    -------
-    list
-        A list of tuples with the top ten dates and the username with the most published 
-        tweets on each of those days.
+    Processes a JSON file to find the top 10 dates with the most tweets 
+    and the user with the most posts for each date. 
     """
     try:
-        # Read JSON data into a Spark DataFrame, selecting only relevant columns
-        df = spark.read.json(file_path).select("date", "user.username")
-        logger.info("Data loaded successfully from JSON file with essential columns selected.")
+        records = []
+        with open(file_path, 'r') as f:
+            for line in f:
+                tweet = json.loads(line)
+                date_str = tweet.get("date", "").split("T")[0]
+                username = tweet.get("user", {}).get("username")
+                if date_str and username:
+                    records.append({"date": date_str, "username": username})
+        logger.info("Successfully read JSON file and extracted records.")
 
-        df = df.withColumn("tweet_date", to_date(col("date").substr(1, 10), "yyyy-MM-dd"))
-        logger.info("Date column converted to date format.")
+        df = pl.DataFrame(records)
+        df = df.with_columns(pl.col("date").str.strptime(pl.Date, "%Y-%m-%d"))
+        logger.info("Data loaded into Polars DataFrame and date parsed.")
 
-        # Group by date and username to count tweets, then use a window to rank users by tweet count
-        date_user_counts = (df.groupBy("tweet_date", "username")
-                            .agg(count("*").alias("tweet_count"))
-                            .orderBy(desc("tweet_count"))
-                            .limit(10))
-        logger.info("Grouped by tweet_date and username, and counted tweets per user per day.")
+        grouped = df.group_by(["date", "username"]).agg(pl.len().alias("tweet_count"))
+        logger.info("Grouped by date and username, counted tweets per group.")
 
-        # Define a window partitioned by date and ordered by tweet count in descending order
-        window_spec = Window.partitionBy("tweet_date").orderBy(desc("tweet_count"))
-        
-        # Rank users within each date partition and get only the top user per date
-        top_user_per_date = (date_user_counts
-                             .withColumn("rank", row_number().over(window_spec))
-                             .filter(col("rank") == 1)
-                             .select("tweet_date", "username", "tweet_count")
-                             .limit(10))  # Limit to top 10 dates after ranking
-        logger.info("Identified the most active user per date.")
+        grouped = grouped.sort(["tweet_count", "username"], descending=[True, False])
+        top_by_date = grouped.group_by("date").agg(pl.col("username").first(), pl.col("tweet_count").first())
+        logger.info("Top user per date identified.")
 
-        # Collect the result as a list of tuples
-        result = [(row["tweet_date"], row["username"]) for row in top_user_per_date.collect() if row["tweet_date"]]
-        logger.info("Result successfully collected.")
+        top_10 = top_by_date.sort("tweet_count", descending=True).head(10)
+        result = [(row[0], row[1]) for row in top_10.rows()]
+        logger.info("Top 10 dates with the most tweets retrieved.")
 
         return result
-    
+
     except Exception as e:
-        logger.error(f"An error occurred while processing the data: {e}")
+        logger.error(f"An error occurred: {e}")
         return []
