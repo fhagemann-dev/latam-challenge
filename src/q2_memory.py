@@ -24,7 +24,10 @@ def q2_memory(file_path: str) -> List[Tuple[str, int]]:
         A list of tuples with the top 10 emojis and their counts.
     """
     try:
+        # Initialize a Counter to keep track of emojis
         emoji_counts = Counter()
+        
+        # Define the set of emojis from emoji.EMOJI_DATA
         emoji_set = set(emoji.EMOJI_DATA.keys())
 
         with open(file_path, 'r') as file:
